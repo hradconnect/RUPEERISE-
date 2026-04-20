@@ -1,0 +1,135 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and financial data",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "name": { "type": "string", "description": "Full name" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "age": { "type": "number", "description": "User age" },
+        "balance": { "type": "number", "description": "Current wallet balance" },
+        "role": { "type": "string", "enum": ["user", "admin"], "description": "User permissions level" },
+        "isVip": { "type": "boolean", "description": "VIP status" },
+        "referralCode": { "type": "string", "description": "Unique referral code" },
+        "referredBy": { "type": "string", "description": "UID of the user who referred this user" },
+        "kyc_url": { "type": "string", "description": "URL to uploaded KYC document" },
+        "bank_details": { "type": "string", "description": "User bank information" },
+        "totalReferralEarnings": { "type": "number", "description": "Total earnings from referrals" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "phone", "age", "balance", "role", "referralCode"]
+    },
+    "Withdrawal": {
+      "title": "Withdrawal",
+      "description": "Withdrawal request record",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "userName": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "net_payout": { "type": "number" },
+        "reason": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "userName", "amount", "status", "timestamp"]
+    },
+    "VipRequest": {
+      "title": "VIP Request",
+      "description": "Request for VIP membership",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "userName": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "userName", "transactionId", "status", "timestamp"]
+    },
+    "AdReward": {
+      "title": "Ad Reward",
+      "description": "Log of earned ad rewards",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "amount": { "type": "number" },
+        "adNetwork": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "amount", "adNetwork", "timestamp"]
+    },
+    "ReferralEarning": {
+      "title": "Referral Earning",
+      "description": "Log of earnings from a direct or indirect referral",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "UID of the earner" },
+        "fromUid": { "type": "string", "description": "UID of the user who generated the earning" },
+        "level": { "type": "integer", "description": "Multi-level marketing level (1-5)" },
+        "amount": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "fromUid", "level", "amount", "timestamp"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "Global system configuration",
+      "type": "object",
+      "properties": {
+        "commission": { "type": "number", "description": "Platform tax deduction percentage" },
+        "vipThreshold": { "type": "number", "description": "Minimum balance for VIP entry" },
+        "minWithdrawal": { "type": "number", "description": "Minimum withdrawal for non-VIPs" },
+        "upiId": { "type": "string", "description": "Admin UPI handle for VIP payments" },
+        "qrUrl": { "type": "string", "description": "URL to admin payment QR code" }
+      }
+    },
+    "Enquiry": {
+      "title": "Enquiry",
+      "description": "Customer support enquiry",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "contactNumber": { "type": "string" },
+        "email": { "type": "string" },
+        "enquiry": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "contactNumber", "email", "enquiry", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Main user records"
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": "Withdrawal",
+      "description": "Withdrawal requests"
+    },
+    "/vip_requests/{requestId}": {
+      "schema": "VipRequest",
+      "description": "VIP membership requests"
+    },
+    "/ad_rewards/{rewardId}": {
+      "schema": "AdReward",
+      "description": "History of ad rewards"
+    },
+    "/referral_earnings/{earningId}": {
+      "schema": "ReferralEarning",
+      "description": "History of referral tax deductions"
+    },
+    "/enquiries/{enquiryId}": {
+      "schema": "Enquiry",
+      "description": "Support tickets"
+    },
+    "/settings/global": {
+      "schema": "Setting",
+      "description": "Global platform parameters"
+    }
+  }
+}

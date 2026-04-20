@@ -1,0 +1,107 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isAdmin() { return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function isVerified() { return request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'phone'; }
+
+    // --- User Validation ---
+    function isValidUser(data) {
+      return data.uid == request.auth.uid
+        && data.phone is string && data.phone.size() >= 10 && data.phone.size() <= 15
+        && data.balance is number && data.balance >= 0
+        && data.role in ['user', 'admin']
+        && (data.name == null || (data.name is string && data.name.size() <= 100))
+        && data.referralCode is string && data.referralCode.size() <= 20
+        && (data.kyc_url == null || (data.kyc_url is string && data.kyc_url.size() <= 500))
+        && (data.bank_details == null || (data.bank_details is string && data.bank_details.size() <= 1000));
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      
+      allow create: if isSignedIn() 
+        && isOwner(userId) 
+        && isValidUser(incoming())
+        && incoming().role == 'user' // Users cannot self-assign admin
+        && incoming().balance == 0   // New users start with 0
+        && incoming().createdAt == request.time;
+
+      allow update: if isSignedIn() && (
+        isAdmin() || (
+          isOwner(userId)
+          && isValidUser(incoming())
+          && incoming().role == existing().role // Cannot change role
+          && (
+            // Regular user updates (profile info)
+            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'kyc_url', 'bank_details', 'updatedAt'])
+            || 
+            // System-like updates that we handle on client for now (balance would ideally be backend but migrating from Appwrite which was client heavy)
+            // To be safe, we might restrict balance updates to only specific conditions or allow it for this demo.
+            incoming().diff(existing()).affectedKeys().hasAll(['balance']) && isAdmin()
+          )
+          && incoming().updatedAt == request.time
+        )
+      );
+    }
+
+    // --- Withdrawals ---
+    function isValidWithdrawal(data) {
+      return data.uid == request.auth.uid
+        && data.userName is string && data.userName.size() <= 100
+        && data.amount is number && data.amount > 0
+        && data.status in ['pending', 'approved', 'rejected']
+        && data.timestamp is string;
+    }
+
+    match /withdrawals/{withdrawalId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.uid == request.auth.uid);
+      
+      allow create: if isSignedIn() 
+        && isValidId(withdrawalId)
+        && isValidWithdrawal(incoming())
+        && incoming().status == 'pending'
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+
+      allow update: if isAdmin() 
+        && incoming().diff(existing()).affectedKeys().hasAny(['status', 'reason', 'net_payout'])
+        && incoming().uid == existing().uid; // Cannot change owner
+      
+      allow delete: if isAdmin();
+    }
+
+    // --- VIP Requests ---
+    match /vip_requests/{requestId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.uid == request.auth.uid);
+      allow create: if isSignedIn() && isValidId(requestId) && incoming().status == 'pending';
+      allow update: if isAdmin();
+    }
+
+    // --- Ad Rewards & Referrals (Server/Write Only via functions or Admin) ---
+    match /ad_rewards/{id} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.uid == request.auth.uid);
+      allow create: if isSignedIn(); // Client creates record after watching ad
+    }
+
+    match /referral_earnings/{id} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.uid == request.auth.uid);
+      allow create: if isAdmin(); // Usually server-side
+    }
+
+    match /enquiries/{id} {
+      allow create: if true; // Public can enquire
+      allow read: if isAdmin();
+    }
+  }
+}
